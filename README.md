@@ -1,3 +1,25 @@
+# Circuit Sax Switch Controls
+
+### Controls *(designed for Smash Bros)*
+
+| Saxophone Key | Switch Button |
+| ------------- | ------------- |
+| 1             | Left Joystick Right |
+| 2             | Left Joystick Left |
+| 4             | Left Joystick Up |
+| 5             | Left Joystick Down |
+| Blowing Air   | A |
+| 3             | A |
+| 6             | B |
+| Octave        | X |
+| Side Bb       | R |
+| Palm D        | L |
+| Eb            | ZR |
+| G#            | ZL |
+| Front F       | + |
+| High E/F      | - |
+| Low C + 1/2/4/5 | Taunt |
+
 ## Switch-Fightstick
 Proof-of-Concept Fightstick for the Nintendo Switch. Uses the LUFA library and reverse-engineering of the Pokken Tournament Pro Pad for the Wii U to enable custom fightsticks on the Switch System v3.0.0.
 
