@@ -60,12 +60,31 @@ void SetupHardware(void)
 	clock_prescale_set(clock_div_1);
 	// We can then initialize our hardware and peripherals, including the USB stack.
 
-	DDRD &= ~(1 << PIND0);
-	DDRD &= ~(1 << PIND1);
-	PORTD = 0b11111111; // enable all pullups
+	// DDRD &= ~(1 << PIND0);
+	// DDRD &= ~(1 << PIND1);
+	// PORTD = 0b11111111; // enable all pullups
 
-	DDRB &= ~(1 << PINB4);
-	PORTB = 0b11111111; // enable all pullups
+	// DDRB &= ~(1 << PINB4);
+	// PORTB = 0b11111111; // enable all pullups
+
+	DDRB = 0x00;
+	DDRC = 0x00;
+	DDRD = 0x00;
+	DDRF = 0x00;
+	// DDRF &= ~(1 << PINF1);
+	PORTB = 0xFF;
+	PORTC = 0xFF;
+	PORTD = 0xFF;
+	// PORTF |= ((1 << PINF1) | (1 << PINF7));
+	PORTF = 0xFF;
+
+	// Select AVcc as the reference voltage
+	ADMUX |= (1 << REFS0);
+	ADMUX &= ~(1 << REFS1);
+
+	// Set the ADC prescaler to 64 for 125kHz ADC clock (assuming 8MHz CPU clock)
+	ADCSRA |= (1 << ADPS2) | (1 << ADPS1);
+	ADCSRA &= ~(1 << ADPS0);
 
 	// The USB stack should be initialized last.
 	USB_Init();
@@ -152,15 +171,39 @@ void HID_Task(void)
 // int echoes = 0;
 // USB_JoystickReport_Input_t last_report;
 
+uint16_t ADC_read(uint8_t channel)
+{
+	// Enable the ADC
+	ADCSRA |= (1 << ADEN);
+
+	// Select the ADC channel (0 to 7)
+	ADMUX = (ADMUX & 0xF0) | (channel & 0x0F);
+
+	// Start the ADC conversion
+	ADCSRA |= (1 << ADSC);
+
+	// Wait until the conversion completes (ADSC becomes 0)
+	while (ADCSRA & (1 << ADSC))
+		;
+
+	// Read the ADC value (10-bit resolution)
+	uint16_t adc_value = ADC;
+	return adc_value;
+}
+
+bool isPressed(uint8_t port, int pin)
+{
+	ADCSRA &= ~(1 << ADEN); // Disable ADC to ensure the pin can be used as digital
+	return !((port & (1 << pin)) == (1 << pin));
+}
+
 // Prepare the next report for the host.
 void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 {
 	// Prepare an empty report
 	memset(ReportData, 0, sizeof(USB_JoystickReport_Input_t));
-	ReportData->LX = STICK_CENTER;
-	ReportData->LY = STICK_CENTER;
-	ReportData->RX = STICK_CENTER;
-	ReportData->RY = STICK_CENTER;
+	int lx = 128;
+	int ly = 128;
 	ReportData->HAT = HAT_CENTER;
 
 	//// Repeat ECHOES times the last report
@@ -171,19 +214,105 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 	//	return;
 	// // }
 
-	if (!(PIND & (1 << PIND1) == (1 << PIND1))) // if pin D0 is low
+	if (isPressed(PIND, PIND1)) // FF
 	{
-		ReportData->Button |= SWITCH_L | SWITCH_R;
+		ReportData->Button |= SWITCH_START;
+	}
+	if (isPressed(PINB, PINB5)) // SK1
+	{
+		ReportData->Button |= SWITCH_SELECT;
 	}
 
-	if (!(PIND & (1 << PIND0) == (1 << PIND0))) // if pin D0 is low
+	if (isPressed(PIND, PIND3)) // D1 - K6
 	{
-		ReportData->LX = STICK_MIN;
+		ReportData->Button |= SWITCH_B;
 	}
-	else if (!(PINB & (1 << PINB4) == (1 << PINB4)))
+	if (isPressed(PIND, PIND2)) // OCT
 	{
-		ReportData->LX = STICK_MAX;
+		ReportData->Button |= SWITCH_X;
 	}
+	if (isPressed(PINB, PINB1)) // SCK - K3
+	{
+		ReportData->Button |= SWITCH_A;
+	}
+
+	if (isPressed(PINB, PINB7)) // D11 - SK3
+	{
+		ReportData->Button |= SWITCH_R;
+	}
+	// if (isPressed(PINB, PINB6)) // D10 - SK2
+	// {
+	// 	ReportData->Button |= SWITCH_R;
+	// }
+	if (isPressed(PIND, PIND4)) // D4 - P1
+	{
+		ReportData->Button |= SWITCH_L;
+	}
+	if (isPressed(PINF, PINF1)) // A4 - Eb
+	{
+		ReportData->Button |= SWITCH_ZR;
+	}
+	if (isPressed(PINF, PINF7)) // A0 - G#
+	{
+		ReportData->Button |= SWITCH_ZL;
+	}
+
+	// Left Joystick
+	if (isPressed(PIND, PIND0)) // K1
+	{
+		if (isPressed(PINB, PINB3))
+		{ // A3 - Bb
+			ReportData->HAT = HAT_RIGHT;
+		}
+		else
+		{
+			lx = 255;
+		}
+	}
+	if (isPressed(PINB, PINB4)) // K2
+	{
+		if (isPressed(PINB, PINB3))
+		{ // A3 - Bb
+			ReportData->HAT = HAT_LEFT;
+		}
+		else
+		{
+			lx = lx == 255 ? 128 : 0;
+		}
+	}
+	if (isPressed(PINC, PINC7)) // D13 - K4
+	{
+		if (isPressed(PINB, PINB3))
+		{ // A3 - Bb
+			ReportData->HAT = HAT_TOP;
+		}
+		else
+		{
+			ly = 0;
+		}
+	}
+	else if (isPressed(PIND, PIND6)) // D12 - K5
+	{
+		if (isPressed(PINB, PINB3))
+		{ // A3 - Bb
+			ReportData->HAT = HAT_BOTTOM;
+		}
+		else
+		{
+			ly = ly == 0 ? 128 : 255;
+		}
+	}
+
+	uint16_t breath_val = ADC_read(0);
+	if (breath_val > 100)
+	{
+		ReportData->Button |= SWITCH_A;
+	}
+
+	ReportData->LX = lx;
+	ReportData->LY = ly;
+	ReportData->RX = 128;
+	ReportData->RY = 128;
 
 	//// Prepare to echo this report
 	// memcpy(&last_report, ReportData, sizeof(USB_JoystickReport_Input_t));
